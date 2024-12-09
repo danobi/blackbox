@@ -1,13 +1,13 @@
 CXX = g++
 CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -Wpedantic -O3
 
-all: demo
+all: demo/demo
 
 libblackbox.so: blackbox.cpp
 	$(CXX) $(CXXFLAGS) -fPIC -shared blackbox.cpp -o libblackbox.so
 
-demo: demo.cpp libblackbox.so
-	$(CXX) $(CXXFLAGS) demo.cpp -L. -lblackbox -Wl,-rpath,. -o demo
+demo/demo: demo/demo.cpp libblackbox.so
+	$(CXX) $(CXXFLAGS) $< -L. -lblackbox -Wl,-rpath,. -o $@
 
 clean:
 	rm -f demo libblackbox.so

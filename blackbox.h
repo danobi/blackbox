@@ -21,7 +21,7 @@
 
 namespace blackbox {
 
-// Optional initialization routine for blackbox.
+// Optional thread-safe initialization routine for blackbox.
 //
 // If not called, the first write() will initialize blackbox to default
 // size and abort on allocation failure. If called explicitly, init()

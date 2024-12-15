@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 
 namespace blackbox {
@@ -7,9 +8,9 @@ namespace internal {
 
 // Header at beginning of shared memory segment
 struct Header {
-  // Generation number of blackbox.
+  // Sequence number of blackbox.
   // Odd value means write is in progress.
-  std::uint64_t generation;
+  std::atomic_uint64_t sequence;
   // Offset of `head` in `data`.
   std::uint64_t head;
   // Logical size of blackbox.
@@ -18,8 +19,10 @@ struct Header {
   // Physical (ie. allocated) size of `data`
   std::uint64_t physical_size;
   // Ring buffer
-  std::uint8_t data[];
+  std::uint8_t data[0];
 };
+static_assert(sizeof(std::atomic_uint64_t) == sizeof(std::uint64_t));
+static_assert(std::atomic_uint64_t::is_always_lock_free);
 static_assert(sizeof(Header) == offsetof(Header, data));
 
 enum class Type : std::uint8_t {

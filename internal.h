@@ -14,10 +14,10 @@ struct Blackbox {
   // Offset of `head` in `data`.
   std::uint64_t head;
   // Logical size of blackbox.
-  // `(head + size) % physical_size` is tail index.
+  // `(head + size) % psize` is tail index.
   std::uint64_t size;
   // Physical (ie. allocated) size of `data`
-  std::uint64_t physical_size;
+  std::uint64_t psize;
   // Ring buffer
   std::uint8_t data[];
 };
@@ -34,14 +34,14 @@ enum class Type : std::uint8_t {
 static_assert(sizeof(Type) == 1);
 
 // Header for each entry in the blackbox
-struct Entry {
+struct Header {
   // Type of entry
   Type type;
   // Start of type dependent data
   std::uint8_t data[];
 };
-static_assert(sizeof(Entry) == sizeof(Type));
-static_assert(sizeof(Entry) == offsetof(Entry, data));
+static_assert(sizeof(Header) == sizeof(Type));
+static_assert(sizeof(Header) == offsetof(Header, data));
 
 // String entry.
 // NUL terminator is not stored.

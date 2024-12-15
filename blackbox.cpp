@@ -86,21 +86,57 @@ void cleanup() {
   ::shm_unlink(shm_name.c_str());
 }
 
+Header *head() {
+  return reinterpret_cast<Header *>(blackbox->data + blackbox->head);
+}
+
+template <typename T> T *entry(Header *e) {
+  return reinterpret_cast<T *>(e->data);
+}
+
 // Makes room in ring buffer for at least `bytes` bytes.
+//
 // Returns number of evicted entries.
 int make_room_for(std::uint64_t bytes) {
-  if (bytes > blackbox->physical_size) {
-    return -ENOSPC;
+  if (bytes > blackbox->psize) {
+    return -E2BIG;
+  } else if (bytes <= (blackbox->psize - blackbox->size)) {
+    return 0;
   }
 
-  // XXX: implement
+  // Delete stuff from head until there's enough room
+  int evicted = 0;
+  while ((blackbox->psize - blackbox->size) < bytes) {
+    std::uint64_t size = 0;
+    auto h = head();
+
+    switch (h->type) {
+    case Type::Invalid:
+      // Should never see an invalid entry if there's enough space
+      return -ENOSPC;
+    case Type::String:
+      size = entry<StringEntry>(h)->size();
+      break;
+    case Type::Int:
+      size = entry<IntEntry>(h)->size();
+      break;
+    case Type::KeyValue:
+      size= entry<KeyValueEntry>(h)->size();
+      break;
+    }
+
+    blackbox->size -= size;
+    blackbox->head = (blackbox->head + size) % blackbox->psize;
+    evicted++;
+  }
+
   return -ENOSYS;
 }
 
 // Inserts an entry into the ring buffer.
 // Returns number of entries that had to be evicted.
 template <typename T> int insert(T *entry) {
-  auto sz = sizeof(Entry) + entry->size();
+  auto sz = sizeof(Header) + entry->size();
   auto evicted = make_room_for(sz);
   if (evicted < 0) {
     return evicted;
@@ -165,7 +201,7 @@ void init(std::size_t size) {
     write_locked([size, ring_size]() {
       blackbox->head = 0;
       blackbox->size = 0;
-      blackbox->physical_size = ring_size;
+      blackbox->psize = ring_size;
       std::memset(blackbox->data, 0, ring_size);
     });
   });

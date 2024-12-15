@@ -11,3 +11,8 @@ XXX: blah
 * Out-of-process extraction (dead)
 * Data consistency protection during extraction
 * Non-blocking extraction
+
+## Interesting tricks
+
+* Entries are TLV (tag-length-value) for extensibility
+* Backing ringbuffer is mapped twice for always-linear access

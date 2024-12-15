@@ -7,7 +7,7 @@ libblackbox.so: blackbox.cpp
 	$(CXX) $(CXXFLAGS) -fPIC -shared blackbox.cpp -o libblackbox.so
 
 demo/demo: demo/demo.cpp libblackbox.so
-	$(CXX) $(CXXFLAGS) $< -L. -lblackbox -Wl,-rpath,. -o $@
+	$(CXX) $(CXXFLAGS) $< -L. -lblackbox -Wl,-rpath,. -I. -o $@
 
 clean:
 	rm -f demo libblackbox.so

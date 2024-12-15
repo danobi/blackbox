@@ -4,12 +4,21 @@
 #include <cstdint>
 #include <string_view>
 
-// Blackbox acts as a "flight recorder" for you application. It's a global
-// singleton ring buffer for structured data that callers can insert.
+// Blackbox acts as a "flight recorder" for your application. It acts as a
+// singleton that holds structured data with FIFO overwrite semantics.
 //
-// The blackbox is designed to be both extractable from outside the application
-// while the process is alive or from a post-mortem coredump. Blackbox provides
-// data consistency guarantees.
+// The blackbox is only written to from inside the application. However, it is
+// designed to be extractable from:
+//
+//    1. Inside the application
+//    2. Outside the application (while alive)
+//    3. Outside the application (after a crash)
+//
+// The blackbox is designed with data consistency in mind. It is always
+// possible to extract consistent a consistent snapshot while the process is
+// alive (assuming a reasonable amount of writes). In the event the application
+// crashes, the extractor will be able to detect any inconsistency.
+
 namespace blackbox {
 
 // Optional initialization routine for blackbox.

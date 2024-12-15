@@ -90,6 +90,11 @@ Header *head() {
   return reinterpret_cast<Header *>(blackbox->data + blackbox->head);
 }
 
+Header *tail() {
+  auto off = (blackbox->head + blackbox->size) % blackbox->psize;
+  return reinterpret_cast<Header *>(blackbox->data + off);
+}
+
 template <typename T> T *entry(Header *e) {
   return reinterpret_cast<T *>(e->data);
 }
@@ -98,9 +103,13 @@ template <typename T> T *entry(Header *e) {
 //
 // Returns number of evicted entries.
 int make_room_for(std::uint64_t bytes) {
+  // Entry is too big to ever insert
   if (bytes > blackbox->psize) {
     return -E2BIG;
-  } else if (bytes <= (blackbox->psize - blackbox->size)) {
+  }
+
+  // There's already enough free space
+  if (bytes <= (blackbox->psize - blackbox->size)) {
     return 0;
   }
 
@@ -134,16 +143,21 @@ int make_room_for(std::uint64_t bytes) {
 }
 
 // Inserts an entry into the ring buffer.
+//
 // Returns number of entries that had to be evicted.
-template <typename T> int insert(T *entry) {
-  auto sz = sizeof(Header) + entry->size();
+int insert(Type type, void *entry, std::uint64_t size) {
+  auto sz = sizeof(Header) + size;
   auto evicted = make_room_for(sz);
   if (evicted < 0) {
     return evicted;
   }
 
-  // XXX: implement
-  return -ENOSYS;
+  auto header = tail();
+  header->type = type;
+  std::memcpy(header->data, entry, size);
+  blackbox->size += size;
+
+  return evicted;
 }
 
 } // namespace
@@ -215,7 +229,7 @@ int write(std::string_view s) noexcept {
   entry->len = s.size();
   std::memcpy(entry->string, s.data(), s.size());
 
-  return insert(entry);
+  return insert(Type::String, entry, entry->size());
 }
 
 int write(std::int64_t i) noexcept {
@@ -225,7 +239,7 @@ int write(std::int64_t i) noexcept {
   auto entry = reinterpret_cast<IntEntry *>(buffer.data());
   entry->val = i;
 
-  return insert(entry);
+  return insert(Type::Int, entry, entry->size());
 }
 
 int write(std::string_view key, std::string_view value) noexcept {
@@ -238,7 +252,7 @@ int write(std::string_view key, std::string_view value) noexcept {
   std::memcpy(entry->data, key.data(), key.size());
   std::memcpy(entry->data + key.size(), value.data(), value.size());
 
-  return insert(entry);
+  return insert(Type::KeyValue, entry, entry->size());
 }
 
 } // namespace blackbox

@@ -130,21 +130,35 @@ void init(std::size_t size) {
       }
 
       // Size segment to requested size
-      auto physical_size = sizeof(Blackbox);
-      auto ring_size = size ? size : DEFAULT_SIZE;
-      physical_size += ring_size;
-      if (::ftruncate(fd, physical_size) < 0) {
+      const auto hdr_size = sizeof(Blackbox);
+      const auto ring_size = size ? size : DEFAULT_SIZE;
+      if (::ftruncate(fd, hdr_size + ring_size) < 0) {
         throw std::system_error(errno, std::system_category(), "ftruncate");
       }
 
-      // Map it into our address space
-      blackbox = static_cast<Blackbox *>(::mmap(
-            nullptr, physical_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-      if (blackbox == MAP_FAILED) {
+      // Reserve header + 2x ringbuffer address space to prevent races.
+      //
+      // We're going to mmap the ring buffer twice so access is always linear
+      // in our address space. This prevents TLV headers from being split
+      // and thus allows reliable pointer casts.
+      const auto addr_space_size = hdr_size + 2 * ring_size;
+      auto ptr = static_cast<char *>(::mmap(nullptr, addr_space_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+      if (ptr == MAP_FAILED) {
+        throw std::system_error(errno, std::system_category(), "mmap");
+      }
+
+      // Map first copy of ring buffer
+      if (::mmap(ptr + hdr_size, ring_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
+        throw std::system_error(errno, std::system_category(), "mmap");
+      }
+
+      // Map second copy of ring buffer at tail of first copy
+      if (::mmap(ptr + hdr_size + ring_size, ring_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
         throw std::system_error(errno, std::system_category(), "mmap");
       }
 
       // Initialize the blackbox
+      blackbox = reinterpret_cast<Blackbox *>(ptr);
       write_locked([size, ring_size]() {
           blackbox->head = 0;
           blackbox->size = 0;

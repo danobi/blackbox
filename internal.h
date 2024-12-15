@@ -52,9 +52,7 @@ struct StringEntry {
   std::uint8_t string[];
 
   // Returns number of bytes this entry occupies (including header)
-  std::uint64_t size() {
-    return sizeof(StringEntry) + len;
-  }
+  std::uint64_t size() { return sizeof(StringEntry) + len; }
 };
 static_assert(sizeof(StringEntry) == sizeof(uint64_t));
 static_assert(sizeof(StringEntry) == offsetof(StringEntry, string));
@@ -64,9 +62,7 @@ struct IntEntry {
   int64_t val;
 
   // Returns number of bytes this entry occupies (including header)
-  std::uint64_t size() {
-    return sizeof(IntEntry);
-  }
+  std::uint64_t size() { return sizeof(IntEntry); }
 };
 
 // Key/value entry.
@@ -81,9 +77,7 @@ struct KeyValueEntry {
   std::uint8_t data[];
 
   // Returns number of bytes this entry occupies (including header)
-  std::uint64_t size() {
-    return sizeof(KeyValueEntry) + key_len + val_len;
-  }
+  std::uint64_t size() { return sizeof(KeyValueEntry) + key_len + val_len; }
 };
 
 } // namespace internal

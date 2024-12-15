@@ -22,6 +22,8 @@
 namespace blackbox {
 namespace {
 
+using namespace internal;
+
 // Default size is 512 KB
 constexpr std::size_t DEFAULT_SIZE = 512 << 10;
 
@@ -30,7 +32,7 @@ std::mutex lock;
 
 // Internal state
 std::once_flag init_flag;
-internal::Blackbox *blackbox = nullptr;
+Blackbox *blackbox = nullptr;
 
 void default_init() {
   try {
@@ -98,7 +100,7 @@ int make_room_for(std::uint64_t bytes) {
 // Returns number of entries that had to be evicted.
 template<typename T>
 int insert(T *entry) {
-  auto sz = sizeof(internal::Entry) + entry->size();
+  auto sz = sizeof(Entry) + entry->size();
   auto evicted = make_room_for(sz);
   if (evicted < 0) {
     return evicted;
@@ -128,7 +130,7 @@ void init(std::size_t size) {
       }
 
       // Size segment to requested size
-      auto physical_size = sizeof(internal::Blackbox);
+      auto physical_size = sizeof(Blackbox);
       auto ring_size = size ? size : DEFAULT_SIZE;
       physical_size += ring_size;
       if (::ftruncate(fd, physical_size) < 0) {
@@ -136,7 +138,7 @@ void init(std::size_t size) {
       }
 
       // Map it into our address space
-      blackbox = static_cast<internal::Blackbox *>(::mmap(
+      blackbox = static_cast<Blackbox *>(::mmap(
             nullptr, physical_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
       if (blackbox == MAP_FAILED) {
         throw std::system_error(errno, std::system_category(), "mmap");
@@ -153,10 +155,10 @@ void init(std::size_t size) {
 }
 
 int write(std::string_view s) noexcept {
-  auto sz = sizeof(internal::StringEntry) + s.size();
+  auto sz = sizeof(StringEntry) + s.size();
   std::vector<std::uint8_t> buffer(sz);
 
-  auto entry = reinterpret_cast<internal::StringEntry *>(buffer.data());
+  auto entry = reinterpret_cast<StringEntry *>(buffer.data());
   entry->len = s.size();
   std::memcpy(entry->string, s.data(), s.size());
 
@@ -164,20 +166,20 @@ int write(std::string_view s) noexcept {
 }
 
 int write(std::int64_t i) noexcept {
-  auto sz = sizeof(internal::IntEntry);
+  auto sz = sizeof(IntEntry);
   std::vector<std::uint8_t> buffer(sz);
 
-  auto entry = reinterpret_cast<internal::IntEntry *>(buffer.data());
+  auto entry = reinterpret_cast<IntEntry *>(buffer.data());
   entry->val = i;
 
   return insert(entry);
 }
 
 int write(std::string_view key, std::string_view value) noexcept {
-  auto sz = sizeof(internal::KeyValueEntry) + key.size() + value.size();
+  auto sz = sizeof(KeyValueEntry) + key.size() + value.size();
   std::vector<std::uint8_t> buffer(sz);
 
-  auto entry = reinterpret_cast<internal::KeyValueEntry *>(buffer.data());
+  auto entry = reinterpret_cast<KeyValueEntry *>(buffer.data());
   entry->key_len = key.size();
   entry->val_len = value.size();
   std::memcpy(entry->data, key.data(), key.size());

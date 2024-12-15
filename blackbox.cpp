@@ -86,13 +86,15 @@ void cleanup() {
   ::shm_unlink(shm_name.c_str());
 }
 
-Header *head() {
-  return reinterpret_cast<Header *>(blackbox->data + blackbox->head);
+Header *header(std::uint64_t off) {
+  return reinterpret_cast<Header *>(blackbox->data + off);
 }
+
+Header *head() { return header(blackbox->head); }
 
 Header *tail() {
   auto off = (blackbox->head + blackbox->size) % blackbox->psize;
-  return reinterpret_cast<Header *>(blackbox->data + off);
+  return header(off);
 }
 
 template <typename T> T *entry(Header *e) {
@@ -122,7 +124,7 @@ int make_room_for(std::uint64_t bytes) {
     switch (h->type) {
     case Type::Invalid:
       // Should never see an invalid entry if there's enough space
-      return -ENOSPC;
+      return -EINVAL;
     case Type::String:
       size = entry<StringEntry>(h)->size();
       break;
@@ -254,6 +256,47 @@ int write(std::string_view key, std::string_view value) noexcept {
   std::memcpy(entry->data + key.size(), value.data(), value.size());
 
   return insert(Type::KeyValue, entry, entry->size());
+}
+
+int dump(std::ostream &out) {
+  int dumped = 0;
+
+  std::scoped_lock guard(lock);
+  auto head = blackbox->head;
+  while (head != (blackbox->head + blackbox->size)) {
+    std::uint64_t size = sizeof(Header);
+    auto hdr = header(head);
+
+    switch (hdr->type) {
+    case Type::Invalid:
+      return -EINVAL;
+    case Type::String: {
+      auto str = entry<StringEntry>(hdr);
+      out << std::string_view(str->string, str->len) << std::endl;
+      size += entry<StringEntry>(hdr)->size();
+      break;
+    }
+    case Type::Int: {
+      auto i = entry<IntEntry>(hdr);
+      out << i->val << std::endl;
+      size += i->size();
+      break;
+    }
+    case Type::KeyValue: {
+      auto kv = entry<KeyValueEntry>(hdr);
+      auto key = std::string_view(kv->data, kv->key_len);
+      auto val = std::string_view(kv->data + kv->key_len, kv->val_len);
+      out << std::format("{}={}", key, val) << std::endl;
+      size += entry<KeyValueEntry>(hdr)->size();
+      break;
+    }
+    }
+
+    dumped++;
+    head += size;
+  }
+
+  return dumped;
 }
 
 } // namespace blackbox

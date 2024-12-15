@@ -49,7 +49,7 @@ struct StringEntry {
   // Bytes in string
   uint64_t len;
   // Start of string
-  std::uint8_t string[];
+  char string[];
 
   // Returns number of bytes this entry occupies (including header)
   std::uint64_t size() { return sizeof(StringEntry) + len; }
@@ -74,7 +74,7 @@ struct KeyValueEntry {
   uint64_t val_len;
   // Beginning of key/value data.
   // Key/value are stored tip to tail.
-  std::uint8_t data[];
+  char data[];
 
   // Returns number of bytes this entry occupies (including header)
   std::uint64_t size() { return sizeof(KeyValueEntry) + key_len + val_len; }

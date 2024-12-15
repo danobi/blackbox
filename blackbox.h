@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <ostream>
 #include <string_view>
 
 // Blackbox acts as a "flight recorder" for your application. It acts as a
@@ -40,5 +41,12 @@ void init(std::size_t size);
 int write(std::string_view s) noexcept;
 int write(std::int64_t i) noexcept;
 int write(std::string_view key, std::string_view value) noexcept;
+
+// Dump contents of blackbox to an output stream with each entry on
+// its own line.
+//
+// Returns number of entries dumped on success. On failure, returns
+// negative error code suitable for std::strerror(-ret).
+int dump(std::ostream &out);
 
 } // namespace blackbox

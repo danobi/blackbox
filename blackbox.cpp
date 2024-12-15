@@ -186,7 +186,8 @@ void init(std::size_t size) {
       throw std::system_error(errno, std::system_category(), "ftruncate");
     }
 
-    // Reserve header + 2x ringbuffer address space to prevent races.
+    // Reserve header + 2x ringbuffer address space to prevent races with
+    // any other allocations the application might be doing.
     //
     // We're going to mmap the ring buffer twice so access is always linear
     // in our address space. This prevents TLV headers from being split

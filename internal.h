@@ -7,7 +7,7 @@ namespace blackbox {
 namespace internal {
 
 // Header at beginning of shared memory segment
-struct Header {
+struct Blackbox {
   // Sequence number of blackbox.
   // Odd value means write is in progress.
   std::atomic_uint64_t sequence;
@@ -23,7 +23,7 @@ struct Header {
 };
 static_assert(sizeof(std::atomic_uint64_t) == sizeof(std::uint64_t));
 static_assert(std::atomic_uint64_t::is_always_lock_free);
-static_assert(sizeof(Header) == offsetof(Header, data));
+static_assert(sizeof(Blackbox) == offsetof(Blackbox, data));
 
 enum class Type : std::uint8_t {
   Invalid = 0,

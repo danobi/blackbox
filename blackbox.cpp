@@ -30,7 +30,7 @@ std::mutex lock;
 
 // Internal state
 std::once_flag init_flag;
-internal::Header *header = nullptr;
+internal::Blackbox *blackbox = nullptr;
 
 void default_init() {
   try {
@@ -50,7 +50,7 @@ void write_locked(std::function<void()> f) {
 
   // Transition into write and prevent any previous stores from being
   // reordered after this increment.
-  header->sequence.fetch_add(1, std::memory_order_release);
+  blackbox->sequence.fetch_add(1, std::memory_order_release);
 
   // Fence writes such that subsequent writes are not ordered before
   // prior sequence increment. The previous std::memory_order_release only
@@ -65,7 +65,7 @@ void write_locked(std::function<void()> f) {
   //
   // Note we do not do additional fencing like above b/c we do not care
   // at this point if subsequent writes are ordered before the transition.
-  header->sequence.fetch_add(1, std::memory_order_release);
+  blackbox->sequence.fetch_add(1, std::memory_order_release);
 
   // Pair with above lock()
   lock.unlock();
@@ -86,7 +86,7 @@ void cleanup() {
 // Makes room in ring buffer for at least `bytes` bytes.
 // Returns number of evicted entries.
 int make_room_for(std::uint64_t bytes) {
-  if (bytes > header->physical_size) {
+  if (bytes > blackbox->physical_size) {
     return -ENOSPC;
   }
 
@@ -128,7 +128,7 @@ void init(std::size_t size) {
       }
 
       // Size segment to requested size
-      auto physical_size = sizeof(internal::Header);
+      auto physical_size = sizeof(internal::Blackbox);
       auto ring_size = size ? size : DEFAULT_SIZE;
       physical_size += ring_size;
       if (::ftruncate(fd, physical_size) < 0) {
@@ -136,18 +136,18 @@ void init(std::size_t size) {
       }
 
       // Map it into our address space
-      header = static_cast<internal::Header *>(::mmap(
+      blackbox = static_cast<internal::Blackbox *>(::mmap(
             nullptr, physical_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-      if (header == MAP_FAILED) {
+      if (blackbox == MAP_FAILED) {
         throw std::system_error(errno, std::system_category(), "mmap");
       }
 
       // Initialize the blackbox
       write_locked([size, ring_size]() {
-          header->head = 0;
-          header->size = 0;
-          header->physical_size = ring_size;
-          std::memset(header->data, 0, ring_size);
+          blackbox->head = 0;
+          blackbox->size = 0;
+          blackbox->physical_size = ring_size;
+          std::memset(blackbox->data, 0, ring_size);
       });
   });
 }

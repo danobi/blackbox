@@ -19,14 +19,15 @@ struct Header {
   // Physical (ie. allocated) size of `data`
   std::uint64_t physical_size;
   // Ring buffer
-  std::uint8_t data[0];
+  std::uint8_t data[];
 };
 static_assert(sizeof(std::atomic_uint64_t) == sizeof(std::uint64_t));
 static_assert(std::atomic_uint64_t::is_always_lock_free);
 static_assert(sizeof(Header) == offsetof(Header, data));
 
 enum class Type : std::uint8_t {
-  String = 0,
+  Invalid = 0,
+  String,
   Int,
   KeyValue,
 };
@@ -49,6 +50,11 @@ struct StringEntry {
   uint64_t len;
   // Start of string
   std::uint8_t string[];
+
+  // Returns number of bytes this entry occupies (including header)
+  std::uint64_t size() {
+    return sizeof(StringEntry) + len;
+  }
 };
 static_assert(sizeof(StringEntry) == sizeof(uint64_t));
 static_assert(sizeof(StringEntry) == offsetof(StringEntry, string));
@@ -56,6 +62,11 @@ static_assert(sizeof(StringEntry) == offsetof(StringEntry, string));
 // Signed integer entry.
 struct IntEntry {
   int64_t val;
+
+  // Returns number of bytes this entry occupies (including header)
+  std::uint64_t size() {
+    return sizeof(IntEntry);
+  }
 };
 
 // Key/value entry.
@@ -68,6 +79,11 @@ struct KeyValueEntry {
   // Beginning of key/value data.
   // Key/value are stored tip to tail.
   std::uint8_t data[];
+
+  // Returns number of bytes this entry occupies (including header)
+  std::uint64_t size() {
+    return sizeof(KeyValueEntry) + key_len + val_len;
+  }
 };
 
 } // namespace internal

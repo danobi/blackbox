@@ -1,6 +1,7 @@
 #include "blackbox.h"
 
 #include <atomic>
+#include <cassert>
 #include <cerrno>
 #include <cstring>
 #include <exception>
@@ -82,6 +83,31 @@ void cleanup() {
   ::shm_unlink(shm_name.c_str());
 }
 
+// Makes room in ring buffer for at least `bytes` bytes.
+// Returns number of evicted entries.
+int make_room_for(std::uint64_t bytes) {
+  if (bytes > header->physical_size) {
+    return -ENOSPC;
+  }
+
+  // XXX: implement
+  return -ENOSYS;
+}
+
+// Inserts an entry into the ring buffer.
+// Returns number of entries that had to be evicted.
+template<typename T>
+int insert(T *entry) {
+  auto sz = sizeof(internal::Entry) + entry->size();
+  auto evicted = make_room_for(sz);
+  if (evicted < 0) {
+    return evicted;
+  }
+
+  // XXX: implement
+  return -ENOSYS;
+}
+
 } // namespace
 
 void init(std::size_t size) {
@@ -127,22 +153,37 @@ void init(std::size_t size) {
 }
 
 int write(std::string_view s) noexcept {
-  // TODO: implement
-  (void)s;
-  return -ENOSYS;
+  auto sz = sizeof(internal::StringEntry) + s.size();
+  std::vector<std::uint8_t> buffer(sz);
+
+  auto entry = reinterpret_cast<internal::StringEntry *>(buffer.data());
+  entry->len = s.size();
+  std::memcpy(entry->string, s.data(), s.size());
+
+  return insert(entry);
 }
 
 int write(std::int64_t i) noexcept {
-  // TODO: implement
-  (void)i;
-  return -ENOSYS;
+  auto sz = sizeof(internal::IntEntry);
+  std::vector<std::uint8_t> buffer(sz);
+
+  auto entry = reinterpret_cast<internal::IntEntry *>(buffer.data());
+  entry->val = i;
+
+  return insert(entry);
 }
 
 int write(std::string_view key, std::string_view value) noexcept {
-  // TODO: implement
-  (void)key;
-  (void)value;
-  return -ENOSYS;
+  auto sz = sizeof(internal::KeyValueEntry) + key.size() + value.size();
+  std::vector<std::uint8_t> buffer(sz);
+
+  auto entry = reinterpret_cast<internal::KeyValueEntry *>(buffer.data());
+  entry->key_len = key.size();
+  entry->val_len = value.size();
+  std::memcpy(entry->data, key.data(), key.size());
+  std::memcpy(entry->data + key.size(), value.data(), value.size());
+
+  return insert(entry);
 }
 
 } // namespace blackbox

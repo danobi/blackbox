@@ -262,7 +262,8 @@ int dump(std::ostream &out) {
 
   int dumped = 0;
   auto head = blackbox->head;
-  while (head != (blackbox->head + blackbox->size)) {
+  auto tail = blackbox->head + blackbox->size;
+  while (head != tail) {
     std::uint64_t size = sizeof(Header);
     auto hdr = header(head);
 

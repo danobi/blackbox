@@ -216,6 +216,7 @@ int write(std::string_view s) noexcept {
   auto entry = reinterpret_cast<StringEntry *>(buffer.data());
   entry->len = s.size();
   std::memcpy(entry->string, s.data(), s.size());
+  assert(sz == entry->size());
 
   return insert(Type::String, entry, entry->size());
 }
@@ -226,6 +227,7 @@ int write(std::int64_t i) noexcept {
 
   auto entry = reinterpret_cast<IntEntry *>(buffer.data());
   entry->val = i;
+  assert(sz == entry->size());
 
   return insert(Type::Int, entry, entry->size());
 }
@@ -239,6 +241,7 @@ int write(std::string_view key, std::string_view value) noexcept {
   entry->val_len = value.size();
   std::memcpy(entry->data, key.data(), key.size());
   std::memcpy(entry->data + key.size(), value.data(), value.size());
+  assert(sz == entry->size());
 
   return insert(Type::KeyValue, entry, entry->size());
 }

@@ -171,26 +171,12 @@ int make_room_for(std::uint64_t bytes) {
   // Delete stuff from head until there's enough room
   int evicted = 0;
   while ((blackbox->psize - blackbox->size) < bytes) {
-    std::uint64_t size = 0;
     auto h = head();
+    assert(h->type != Type::Invalid);
 
-    switch (h->type) {
-    case Type::Invalid:
-      // Should never see an invalid entry if there's enough space
-      return -EINVAL;
-    case Type::String:
-      size = entry<StringEntry>(h)->size();
-      break;
-    case Type::Int:
-      size = entry<IntEntry>(h)->size();
-      break;
-    case Type::KeyValue:
-      size= entry<KeyValueEntry>(h)->size();
-      break;
-    }
-
-    blackbox->size -= size;
-    blackbox->head = (blackbox->head + size) % blackbox->psize;
+    auto deleted_sz = h->size();
+    blackbox->size -= deleted_sz;
+    blackbox->head = (blackbox->head + deleted_sz) % blackbox->psize;
     evicted++;
   }
 
@@ -264,36 +250,32 @@ int dump(std::ostream &out) {
   auto head = blackbox->head;
   auto tail = blackbox->head + blackbox->size;
   while (head != tail) {
-    std::uint64_t size = sizeof(Header);
     auto hdr = header(head);
 
     switch (hdr->type) {
-    case Type::Invalid:
-      return -EINVAL;
     case Type::String: {
       auto str = entry<StringEntry>(hdr);
-      size += str->size();
       out << std::string_view(str->string, str->len) << std::endl;
       break;
     }
     case Type::Int: {
       auto i = entry<IntEntry>(hdr);
-      size += i->size();
       out << i->val << std::endl;
       break;
     }
     case Type::KeyValue: {
       auto kv = entry<KeyValueEntry>(hdr);
-      size += kv->size();
       auto key = std::string_view(kv->data, kv->key_len);
       auto val = std::string_view(kv->data + kv->key_len, kv->val_len);
       out << std::format("{}={}", key, val) << std::endl;
       break;
     }
+    case Type::Invalid:
+      return -EINVAL;
     }
 
     dumped++;
-    head += size;
+    head += hdr->size();
   }
 
   return dumped;

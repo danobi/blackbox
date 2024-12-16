@@ -38,16 +38,6 @@ enum class Type : std::uint8_t {
 };
 static_assert(sizeof(Type) == 1);
 
-// Header for each entry in the blackbox
-struct Header {
-  // Type of entry
-  Type type;
-  // Start of type dependent data
-  std::uint8_t data[];
-};
-static_assert(sizeof(Header) == sizeof(Type));
-static_assert(sizeof(Header) == offsetof(Header, data));
-
 // String entry.
 // NUL terminator is not stored.
 struct StringEntry {
@@ -84,6 +74,38 @@ struct KeyValueEntry {
   // Returns number of bytes this entry occupies (including header)
   std::uint64_t size() { return sizeof(KeyValueEntry) + key_len + val_len; }
 };
+
+// Header for each entry in the blackbox
+struct Header {
+  // Type of entry
+  Type type;
+  // Start of type dependent data
+  std::uint8_t data[];
+
+  std::uint64_t size() {
+    auto sz = sizeof(Header);
+
+    switch (type) {
+    case Type::Invalid:
+      // Very suspicious to take size of invalid entry.
+      // But technically it has no trailing value.
+      break;
+    case Type::String:
+      sz += reinterpret_cast<StringEntry *>(data)->size();
+      break;
+    case Type::Int:
+      sz += reinterpret_cast<IntEntry *>(data)->size();
+      break;
+    case Type::KeyValue:
+      sz += reinterpret_cast<KeyValueEntry *>(data)->size();
+      break;
+    }
+
+    return sz;
+  }
+};
+static_assert(sizeof(Header) == sizeof(Type));
+static_assert(sizeof(Header) == offsetof(Header, data));
 
 } // namespace internal
 } // namespace blackbox

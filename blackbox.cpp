@@ -200,17 +200,17 @@ int make_room_for(std::uint64_t bytes) {
 // Inserts an entry into the ring buffer.
 //
 // Returns number of entries that had to be evicted.
-int insert(Type type, void *entry, std::uint64_t size) {
+int insert(Type type, void *entry, std::uint64_t entry_size) {
   return write_locked([&]() {
-    auto sz = sizeof(Header) + size;
-    auto evicted = make_room_for(sz);
+    auto size = sizeof(Header) + entry_size;
+    auto evicted = make_room_for(size);
     if (evicted < 0) {
       return evicted;
     }
 
     auto hdr = tail();
     hdr->type = type;
-    std::memcpy(hdr->data, entry, size);
+    std::memcpy(hdr->data, entry, entry_size);
     blackbox->size += size;
 
     return evicted;

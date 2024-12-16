@@ -22,6 +22,9 @@
 
 namespace blackbox {
 
+// Default size of the ring buffer backing the blackbox.
+//
+// This does not include the page blackbox reserves for management overhead.
 constexpr std::size_t DEFAULT_SIZE = 512 << 10;
 
 // Thread-safe initialization routine for blackbox.

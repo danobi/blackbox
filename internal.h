@@ -39,6 +39,7 @@ enum class Type : std::uint8_t {
 static_assert(sizeof(Type) == 1);
 
 // String entry.
+//
 // NUL terminator is not stored.
 struct StringEntry {
   // Bytes in string
@@ -61,6 +62,7 @@ struct IntEntry {
 };
 
 // Key/value entry.
+//
 // No NUL terminators are stored.
 struct KeyValueEntry {
   // Bytes in key string
@@ -75,7 +77,9 @@ struct KeyValueEntry {
   std::uint64_t size() { return sizeof(KeyValueEntry) + key_len + val_len; }
 };
 
-// Header for each entry in the blackbox
+// Type header for each entry in the blackbox.
+//
+// This is the outer-most header.
 struct Header {
   // Type of entry
   Type type;

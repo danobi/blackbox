@@ -38,12 +38,12 @@ void default_init() {
   try {
     init(0);
   } catch (const std::exception &ex) {
-    std::cerr << "blackbox: fatal failure to allocate" << std::endl;
+    std::cerr << "blackbox: fatal init failure: " << ex.what() << std::endl;
     std::abort();
   }
 }
 
-void write_locked(std::function<void()> f) {
+template <typename F> auto write_locked(F &&f) -> decltype(f()) {
   // Provides its own synchronization
   default_init();
 
@@ -60,7 +60,7 @@ void write_locked(std::function<void()> f) {
   std::atomic_thread_fence(std::memory_order_release);
 
   // Write new entry
-  f();
+  auto retval = f();
 
   // Transition out of write and prevent any previous stores from being
   // reordered after this increment.
@@ -71,6 +71,8 @@ void write_locked(std::function<void()> f) {
 
   // Pair with above lock()
   lock.unlock();
+
+  return retval;
 }
 
 std::string get_shm_name() {
@@ -148,18 +150,20 @@ int make_room_for(std::uint64_t bytes) {
 //
 // Returns number of entries that had to be evicted.
 int insert(Type type, void *entry, std::uint64_t size) {
-  auto sz = sizeof(Header) + size;
-  auto evicted = make_room_for(sz);
-  if (evicted < 0) {
+  return write_locked([=]() {
+    auto sz = sizeof(Header) + size;
+    auto evicted = make_room_for(sz);
+    if (evicted < 0) {
+      return evicted;
+    }
+
+    auto header = tail();
+    header->type = type;
+    std::memcpy(header->data, entry, size);
+    blackbox->size += size;
+
     return evicted;
-  }
-
-  auto header = tail();
-  header->type = type;
-  std::memcpy(header->data, entry, size);
-  blackbox->size += size;
-
-  return evicted;
+  });
 }
 
 } // namespace
@@ -220,6 +224,9 @@ void init(std::size_t size) {
       blackbox->size = 0;
       blackbox->psize = ring_size;
       std::memset(blackbox->data, 0, ring_size);
+
+      // Hack to avoid dealing with void return type
+      return 0;
     });
   });
 }
@@ -259,9 +266,12 @@ int write(std::string_view key, std::string_view value) noexcept {
 }
 
 int dump(std::ostream &out) {
-  int dumped = 0;
+  // Provides its own synchronization
+  default_init();
 
   std::scoped_lock guard(lock);
+
+  int dumped = 0;
   auto head = blackbox->head;
   while (head != (blackbox->head + blackbox->size)) {
     std::uint64_t size = sizeof(Header);

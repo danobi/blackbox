@@ -202,19 +202,19 @@ void init(std::size_t size) {
     auto ptr = static_cast<char *>(::mmap(nullptr, addr_space_size, PROT_NONE,
                                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
     if (ptr == MAP_FAILED) {
-      throw std::system_error(errno, std::system_category(), "mmap");
+      throw std::system_error(errno, std::system_category(), "mmap anon");
     }
 
     // Map first copy of ring buffer
     if (::mmap(ptr + hdr_size, ring_size, PROT_READ | PROT_WRITE,
                MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
-      throw std::system_error(errno, std::system_category(), "mmap");
+      throw std::system_error(errno, std::system_category(), "mmap rb1");
     }
 
     // Map second copy of ring buffer at tail of first copy
     if (::mmap(ptr + hdr_size + ring_size, ring_size, PROT_READ | PROT_WRITE,
                MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
-      throw std::system_error(errno, std::system_category(), "mmap");
+      throw std::system_error(errno, std::system_category(), "mmap rb2");
     }
 
     // Initialize the blackbox

@@ -11,19 +11,24 @@ struct Blackbox {
   // Sequence number of blackbox.
   // Odd value means write is in progress.
   std::atomic_uint64_t sequence;
-  // Offset of `head` in `data`.
+  // Offset of `head` in ring buffer
   std::uint64_t head;
   // Logical size of blackbox.
   // `(head + size) % psize` is tail index.
   std::uint64_t size;
-  // Physical (ie. allocated) size of `data`
+  // Physical (ie. allocated) size of ring buffer
   std::uint64_t psize;
-  // Ring buffer
-  std::uint8_t data[];
+  // Bytes of padding until start of ring buffer.
+  // This is necessary to achieve PAGE_SIZE alignment so
+  // we can double map the ring buffer.
+  std::uint64_t padding;
+  // Start of padding.
+  // `->padding_start + padding` is start of ring buffer.
+  std::uint8_t padding_start[];
 };
 static_assert(sizeof(std::atomic_uint64_t) == sizeof(std::uint64_t));
 static_assert(std::atomic_uint64_t::is_always_lock_free);
-static_assert(sizeof(Blackbox) == offsetof(Blackbox, data));
+static_assert(sizeof(Blackbox) == offsetof(Blackbox, padding_start));
 
 enum class Type : std::uint8_t {
   Invalid = 0,

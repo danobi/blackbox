@@ -34,6 +34,10 @@ std::mutex lock;
 std::once_flag init_flag;
 Blackbox *blackbox = nullptr;
 
+std::size_t round_up_to_nearest(std::size_t size, std::size_t align) {
+  return (size + align - 1) & ~(align - 1);
+}
+
 void default_init() {
   try {
     init(0);
@@ -89,7 +93,8 @@ void cleanup() {
 }
 
 Header *header(std::uint64_t off) {
-  return reinterpret_cast<Header *>(blackbox->data + off);
+  auto data = blackbox->padding_start + blackbox->padding;
+  return reinterpret_cast<Header *>(data + off);
 }
 
 Header *head() { return header(blackbox->head); }
@@ -185,10 +190,14 @@ void init(std::size_t size) {
       throw std::system_error(errno, std::generic_category(), "atexit");
     }
 
-    // Size segment to requested size
-    const auto hdr_size = sizeof(Blackbox);
-    const auto ring_size = size ? size : DEFAULT_SIZE;
-    if (::ftruncate(fd, hdr_size + ring_size) < 0) {
+    // Give ring buffer PAGE_SIZE alignment so we can double map
+    const std::size_t page_size = getpagesize();
+    auto ring_size = size ? size : DEFAULT_SIZE;
+    ring_size = round_up_to_nearest(ring_size, page_size);
+
+    // Size segment to requested size.
+    // NB: we give the header a full page to achieve alignment.
+    if (::ftruncate(fd, page_size + ring_size) < 0) {
       throw std::system_error(errno, std::system_category(), "ftruncate");
     }
 
@@ -198,7 +207,7 @@ void init(std::size_t size) {
     // We're going to mmap the ring buffer twice so access is always linear
     // in our address space. This prevents TLV headers from being split
     // and thus allows reliable pointer casts.
-    const auto addr_space_size = hdr_size + 2 * ring_size;
+    const auto addr_space_size = page_size + 2 * ring_size;
     auto ptr = static_cast<char *>(::mmap(nullptr, addr_space_size, PROT_NONE,
                                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
     if (ptr == MAP_FAILED) {
@@ -206,24 +215,25 @@ void init(std::size_t size) {
     }
 
     // Map first copy of ring buffer
-    if (::mmap(ptr + hdr_size, ring_size, PROT_READ | PROT_WRITE,
+    if (::mmap(ptr + page_size, ring_size, PROT_READ | PROT_WRITE,
                MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
       throw std::system_error(errno, std::system_category(), "mmap rb1");
     }
 
     // Map second copy of ring buffer at tail of first copy
-    if (::mmap(ptr + hdr_size + ring_size, ring_size, PROT_READ | PROT_WRITE,
+    if (::mmap(ptr + page_size + ring_size, ring_size, PROT_READ | PROT_WRITE,
                MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
       throw std::system_error(errno, std::system_category(), "mmap rb2");
     }
 
     // Initialize the blackbox
     blackbox = reinterpret_cast<Blackbox *>(ptr);
-    write_locked([size, ring_size]() {
+    write_locked([page_size, ring_size]() {
       blackbox->head = 0;
       blackbox->size = 0;
       blackbox->psize = ring_size;
-      std::memset(blackbox->data, 0, ring_size);
+      blackbox->padding = page_size - sizeof(Blackbox);
+      std::memset(blackbox->padding_start + blackbox->padding, 0, ring_size);
 
       // Hack to avoid dealing with void return type
       return 0;

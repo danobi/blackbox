@@ -22,14 +22,16 @@
 
 namespace blackbox {
 
-// Optional thread-safe initialization routine for blackbox.
+constexpr std::size_t DEFAULT_SIZE = 512 << 10;
+
+// Thread-safe initialization routine for blackbox.
 //
-// If not called, the first write() will initialize blackbox to default
-// size and abort on allocation failure. If called explicitly, init()
-// will throw on failure.
+// Must be called before any other calls to blackbox APIs. Otherwise calling
+// any of the APIs is undefined behavior.
 //
-// `size` may be set to zero to indicate default size.
-void init(std::size_t size);
+// `size` must be a multiple of PAGE_SIZE. If `size` is not, blackbox will
+// round up to the nearest multiple of PAGE_SIZE.
+void init(std::size_t size = DEFAULT_SIZE);
 
 // Thread-safe writes into the blackbox.
 //

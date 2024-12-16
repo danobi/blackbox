@@ -201,16 +201,16 @@ int make_room_for(std::uint64_t bytes) {
 //
 // Returns number of entries that had to be evicted.
 int insert(Type type, void *entry, std::uint64_t size) {
-  return write_locked([=]() {
+  return write_locked([&]() {
     auto sz = sizeof(Header) + size;
     auto evicted = make_room_for(sz);
     if (evicted < 0) {
       return evicted;
     }
 
-    auto header = tail();
-    header->type = type;
-    std::memcpy(header->data, entry, size);
+    auto hdr = tail();
+    hdr->type = type;
+    std::memcpy(hdr->data, entry, size);
     blackbox->size += size;
 
     return evicted;

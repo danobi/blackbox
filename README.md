@@ -4,13 +4,12 @@ XXX: blah
 
 ## Features
 
-* Strongly typed data
+* Structured data
 * Thread-safe API
 * In-process extraction
-* Out-of-process extraction (alive)
-* Out-of-process extraction (dead)
-* Data consistency protection during extraction
-* Non-blocking extraction
+* Non-blocking out-of-process extraction (alive)
+* Non-blocking out-of-process extraction (dead)
+* Data consistency failsafes during extraction
 
 ## Interesting tricks
 

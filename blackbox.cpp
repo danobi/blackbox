@@ -110,7 +110,8 @@ void init_once(std::size_t size) {
   // in our address space. This prevents TLV headers from being split
   // and thus allows reliable pointer casts.
   const auto addr_space_size = page_size + 2 * ring_size;
-  auto ptr = static_cast<char *>(::mmap(nullptr, addr_space_size, PROT_NONE,
+  auto ptr = static_cast<char *>(::mmap(nullptr, addr_space_size,
+                                        PROT_READ | PROT_WRITE,
                                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
   if (ptr == MAP_FAILED) {
     throw std::system_error(errno, std::system_category(), "mmap anon");

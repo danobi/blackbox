@@ -48,9 +48,6 @@ void default_init() {
 }
 
 template <typename F> auto write_locked(F &&f) -> decltype(f()) {
-  // Provides its own synchronization
-  default_init();
-
   // Ensure only one writer is writing
   lock.lock();
 
@@ -155,6 +152,9 @@ int make_room_for(std::uint64_t bytes) {
 //
 // Returns number of entries that had to be evicted.
 int insert(Type type, void *entry, std::uint64_t size) {
+  // Provides its own synchronization
+  default_init();
+
   return write_locked([=]() {
     auto sz = sizeof(Header) + size;
     auto evicted = make_room_for(sz);

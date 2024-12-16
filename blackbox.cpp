@@ -271,22 +271,22 @@ int dump(std::ostream &out) {
       return -EINVAL;
     case Type::String: {
       auto str = entry<StringEntry>(hdr);
+      size += str->size();
       out << std::string_view(str->string, str->len) << std::endl;
-      size += entry<StringEntry>(hdr)->size();
       break;
     }
     case Type::Int: {
       auto i = entry<IntEntry>(hdr);
-      out << i->val << std::endl;
       size += i->size();
+      out << i->val << std::endl;
       break;
     }
     case Type::KeyValue: {
       auto kv = entry<KeyValueEntry>(hdr);
+      size += kv->size();
       auto key = std::string_view(kv->data, kv->key_len);
       auto val = std::string_view(kv->data + kv->key_len, kv->val_len);
       out << std::format("{}={}", key, val) << std::endl;
-      size += entry<KeyValueEntry>(hdr)->size();
       break;
     }
     }

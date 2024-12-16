@@ -19,5 +19,6 @@ XXX: blah
 
 ## TODO
 
+- [ ] Check on if atexit() handlers run on segfault
 - [ ] Cleanup on partial init
 - [ ] Check if memory barrier alone is sufficient

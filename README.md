@@ -16,3 +16,8 @@ XXX: blah
 
 * Entries are TLV (tag-length-value) for extensibility
 * Backing ringbuffer is mapped twice for always-linear access
+
+## TODO
+
+- [ ] Cleanup on partial init
+- [ ] Check if memory barrier alone is sufficient

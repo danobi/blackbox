@@ -7,7 +7,7 @@ blackbox. This blackbox can then be extracted internally (API call) or
 externally (by another process).
 
 The internal extration is obvious, simple, and requires no explanation. The
-external extraction is quite clever and has interesting properties.
+external extraction is somewhat novel and has interesting properties.
 
 For one, the external extractor does not require heavy-weight synchronization
 from the application. Rather, the blackbox implementation uses shared memory
@@ -17,6 +17,8 @@ the application blackbox.
 Furthermore, the blackbox is designed to be preserved after a crash. This is
 similar to a real airplane blackbox. "Clean" (normal program termination) exit
 from the application destroys the blackbox.
+
+The API is documented in [blackbox.h](./blackbox.h).
 
 ## Demo
 
@@ -55,3 +57,5 @@ key1=val1
 - [ ] Check that wraparound codepaths actually work
 - [ ] Check on if atexit() handlers run on segfault
 - [ ] Cleanup on partial init
+- [ ] Make extractor respect force
+- [ ] Make extractor check application liveness

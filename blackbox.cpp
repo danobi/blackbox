@@ -39,14 +39,15 @@ template <typename F> auto write_locked(F &&f) -> decltype(f()) {
   // Ensure only one writer is writing
   lock.lock();
 
-  // Transition into write and prevent any previous stores from being
-  // reordered after this increment.
-  blackbox->sequence.fetch_add(1, std::memory_order_release);
-
-  // Fence writes such that subsequent writes are not ordered before
-  // prior sequence increment. The previous std::memory_order_release only
-  // ensures prior writes are not ordered after the atomic operation.
-  std::atomic_thread_fence(std::memory_order_release);
+  // Transition into write and prevent any stores from being reordered around
+  // this increment.
+  //
+  // memory_order_acq_rel is chosen b/c the critial section (subsequent stores)
+  // must not be reordered before the sequence is incremented.
+  // memory_order_release is not sufficient as it only guarantees prior stores
+  // are not reordered after the increment, and not the other way around (which
+  // we need).
+  blackbox->sequence.fetch_add(1, std::memory_order_acq_rel);
 
   // Write new entry
   auto retval = f();
@@ -54,8 +55,13 @@ template <typename F> auto write_locked(F &&f) -> decltype(f()) {
   // Transition out of write and prevent any previous stores from being
   // reordered after this increment.
   //
-  // Note we do not do additional fencing like above b/c we do not care
-  // at this point if subsequent writes are ordered before the transition.
+  // Note we do not need acquire_release semantics like above b/c release
+  // semantics are strong enough to ensure stores in the critical section will
+  // be visible before the sequence increment.
+  //
+  // Any subsequent stores are free to move into the critical section if it
+  // makes the program run faster. Any subsequent critical sections will be
+  // fenced by its corresponding acquire_release increment.
   blackbox->sequence.fetch_add(1, std::memory_order_release);
 
   // Pair with above lock()

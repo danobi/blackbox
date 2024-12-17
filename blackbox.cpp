@@ -66,7 +66,7 @@ template <typename F> auto write_locked(F &&f) -> decltype(f()) {
 
 std::string get_shm_name() {
   auto pid = ::getpid();
-  return std::format("/blackbox-{}", pid);
+  return std::format(BLACKBOX_SHM_FMTSTR, pid);
 }
 
 void cleanup() {
@@ -144,22 +144,6 @@ void init_once(std::size_t size) {
   std::memset(blackbox->padding_start + blackbox->padding, 0, ring_size);
 }
 
-Header *header(std::uint64_t off) {
-  auto data = blackbox->padding_start + blackbox->padding;
-  return reinterpret_cast<Header *>(data + off);
-}
-
-Header *head() { return header(blackbox->head); }
-
-Header *tail() {
-  auto off = (blackbox->head + blackbox->size) % blackbox->psize;
-  return header(off);
-}
-
-template <typename T> T *entry(Header *e) {
-  return reinterpret_cast<T *>(e->data);
-}
-
 // Makes room in ring buffer for at least `bytes` bytes.
 //
 // Returns number of evicted entries.
@@ -177,7 +161,7 @@ int make_room_for(std::uint64_t bytes) {
   // Delete stuff from head until there's enough room
   int evicted = 0;
   while ((blackbox->psize - blackbox->size) < bytes) {
-    auto h = head();
+    auto h = head(blackbox);
     assert(h->type != Type::Invalid);
 
     auto deleted_sz = h->size();
@@ -200,7 +184,7 @@ int insert(Type type, void *entry, std::uint64_t entry_size) {
       return evicted;
     }
 
-    auto hdr = tail();
+    auto hdr = tail(blackbox);
     hdr->type = type;
     std::memcpy(hdr->data, entry, entry_size);
     blackbox->size += size;
@@ -259,7 +243,7 @@ int dump(std::ostream &out) {
   auto head = blackbox->head;
   auto tail = blackbox->head + blackbox->size;
   while (head != tail) {
-    auto hdr = header(head);
+    auto hdr = header(blackbox, head);
 
     switch (hdr->type) {
     case Type::String: {

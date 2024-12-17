@@ -6,6 +6,8 @@
 namespace blackbox {
 namespace internal {
 
+static constexpr auto BLACKBOX_SHM_FMTSTR = "/blackbox-{}";
+
 // Header at beginning of shared memory segment
 struct Blackbox {
   // Sequence number of blackbox.
@@ -110,6 +112,22 @@ struct Header {
 };
 static_assert(sizeof(Header) == sizeof(Type));
 static_assert(sizeof(Header) == offsetof(Header, data));
+
+Header *header(Blackbox *blackbox, std::uint64_t off) {
+  auto data = blackbox->padding_start + blackbox->padding;
+  return reinterpret_cast<Header *>(data + off);
+}
+
+Header *head(Blackbox *blackbox) { return header(blackbox, blackbox->head); }
+
+Header *tail(Blackbox *blackbox) {
+  auto off = (blackbox->head + blackbox->size) % blackbox->psize;
+  return header(blackbox, off);
+}
+
+template <typename T> T *entry(Header *e) {
+  return reinterpret_cast<T *>(e->data);
+}
 
 } // namespace internal
 } // namespace blackbox

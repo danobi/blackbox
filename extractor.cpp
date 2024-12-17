@@ -26,6 +26,27 @@ void help() {
             << std::endl;
 }
 
+// Copy blackbox starting at `from` of size `size` into `to`.
+//
+// Note we also linearize the ring buffer to make reading easier
+// without mucking with mmap. We're going to memcpy all the data
+// anyways so this doesn't cost much more.
+void copy(Blackbox *copy, Blackbox *orig) {
+  // Copy header
+  ::memcpy(reinterpret_cast<void *>(copy), orig, sizeof(Blackbox));
+
+  // Copy ring buffer out, linearizing if necessary
+  auto orig_data = orig->padding_start + orig->padding;
+  auto copy_data = copy->padding_start + copy->padding;
+  if (orig->head + orig->size <= orig->psize) {
+    ::memcpy(copy_data, orig_data + orig->head, orig->size);
+  } else {
+    auto linear = orig->psize - orig->head;
+    ::memcpy(copy_data, orig_data + orig->head, linear);
+    ::memcpy(copy_data + linear, orig_data, orig->size - linear);
+  }
+}
+
 std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
   // Open shared memory segment
   auto shm_name = std::format(BLACKBOX_SHM_FMTSTR, pid);
@@ -52,31 +73,15 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
     return nullptr;
   }
 
-  // XXX: respect sequence lock
-
   // Allocate enough memory to hold entire blackbox
-  auto buf = static_cast<char *>(::malloc(sb.st_size));
+  auto blackbox = static_cast<Blackbox *>(::malloc(sb.st_size));
 
   // Copy out entire blackbox to minimize critical section.
-  //
-  // Note we also linearize the ring buffer to make reading easier
-  // without mucking with mmap. We're going to memcpy all the data
-  // anyways so this doesn't cost much more.
-  auto blackbox = static_cast<Blackbox *>(ptr);
-  ::memcpy(buf, blackbox, sizeof(Blackbox));
-  auto data = blackbox->padding_start + blackbox->padding;
-  auto buf_data = buf + sizeof(Blackbox) + blackbox->padding;
-  if (blackbox->head + blackbox->size <= blackbox->psize) {
-    ::memcpy(buf_data, data + blackbox->head, blackbox->size);
-  } else {
-    auto linear = blackbox->psize - blackbox->head;
-    ::memcpy(buf_data, data + blackbox->head, linear);
-    ::memcpy(buf_data + linear, data, blackbox->size - linear);
-  }
+  // XXX: respect sequence lock
+  copy(blackbox, static_cast<Blackbox *>(ptr));
 
   auto deleter = [](Blackbox *p) { ::free(p); };
-  return std::unique_ptr<Blackbox, decltype(deleter)>(
-      reinterpret_cast<Blackbox *>(buf), deleter);
+  return std::unique_ptr<Blackbox, decltype(deleter)>(blackbox, deleter);
 }
 
 int dump(Blackbox *blackbox, bool force) {

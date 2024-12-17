@@ -24,7 +24,7 @@ The API is documented in [blackbox.h](./blackbox.h).
 
 ```
 $ make
-g++ -std=c++20 -Wall -Wextra -Werror -O3 extractor.cpp -o extractor -g
+g++ -std=c++20 -Wall -Wextra -Werror -O3 extractor/extractor.cpp -I. -o extractor/extractor -g
 g++ -std=c++20 -Wall -Wextra -Werror -O3 -fPIC -shared blackbox.cpp -o libblackbox.so -g
 g++ -std=c++20 -Wall -Wextra -Werror -O3 demo/demo.cpp -L. -lblackbox -Wl,-rpath,. -I. -o demo/demo -g
 

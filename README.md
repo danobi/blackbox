@@ -30,7 +30,7 @@ g++ -std=c++20 -Wall -Wextra -Werror -O3 demo/demo.cpp -L. -lblackbox -Wl,-rpath
 
 $ ./demo/demo &
 
-$ ./extractor $(pidof demo)
+$ ./extractor/extractor $(pidof demo)
 hello world!
 123
 key1=val1

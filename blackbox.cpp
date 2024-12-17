@@ -117,15 +117,21 @@ void init_once(std::size_t size) {
     throw std::system_error(errno, std::system_category(), "mmap anon");
   }
 
+  // Map blackbox header
+  if (::mmap(ptr, page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
+             0) == MAP_FAILED) {
+    throw std::system_error(errno, std::system_category(), "mmap bb");
+  }
+
   // Map first copy of ring buffer
   if (::mmap(ptr + page_size, ring_size, PROT_READ | PROT_WRITE,
-             MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
+             MAP_SHARED | MAP_FIXED, fd, page_size) == MAP_FAILED) {
     throw std::system_error(errno, std::system_category(), "mmap rb1");
   }
 
   // Map second copy of ring buffer at tail of first copy
   if (::mmap(ptr + page_size + ring_size, ring_size, PROT_READ | PROT_WRITE,
-             MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
+             MAP_SHARED | MAP_FIXED, fd, page_size) == MAP_FAILED) {
     throw std::system_error(errno, std::system_category(), "mmap rb2");
   }
 

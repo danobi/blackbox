@@ -81,7 +81,7 @@ void init_once(std::size_t size) {
   // Create shared memory segment
   auto shm_name = get_shm_name();
   auto fd = ::shm_open(shm_name.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
-  if (fd < 1) {
+  if (fd < 0) {
     throw std::system_error(errno, std::system_category(), "shm_open");
   }
 

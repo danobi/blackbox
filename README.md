@@ -59,3 +59,4 @@ key1=val1
 - [ ] Cleanup on partial init
 - [ ] Make extractor respect force
 - [ ] Make extractor check application liveness
+- [ ] munmap() in extractor upon unique_ptr destruction

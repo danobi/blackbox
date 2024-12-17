@@ -18,6 +18,6 @@ XXX: blah
 
 ## TODO
 
+- [ ] Tests (you dummy!)
 - [ ] Check on if atexit() handlers run on segfault
 - [ ] Cleanup on partial init
-- [ ] Check if memory barrier alone is sufficient

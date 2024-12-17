@@ -47,7 +47,8 @@ template <typename F> auto write_locked(F &&f) -> decltype(f()) {
   // memory_order_release is not sufficient as it only guarantees prior stores
   // are not reordered after the increment, and not the other way around (which
   // we need).
-  blackbox->sequence.fetch_add(1, std::memory_order_acq_rel);
+  blackbox->sequence.fetch_add(1, std::memory_order_relaxed);
+  std::atomic_thread_fence(std::memory_order_acq_rel);
 
   // Write new entry
   auto retval = f();

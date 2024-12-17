@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <format>
@@ -26,12 +27,12 @@ void help() {
             << std::endl;
 }
 
-// Copy blackbox starting at `from` of size `size` into `to`.
+// Copy the blackbox while inside assuming we're sequence locked.
 //
 // Note we also linearize the ring buffer to make reading easier
 // without mucking with mmap. We're going to memcpy all the data
 // anyways so this doesn't cost much more.
-void copy(Blackbox *copy, Blackbox *orig) {
+void copy_locked(Blackbox *copy, Blackbox *orig) {
   // Copy header
   ::memcpy(reinterpret_cast<void *>(copy), orig, sizeof(Blackbox));
 
@@ -45,6 +46,40 @@ void copy(Blackbox *copy, Blackbox *orig) {
     ::memcpy(copy_data, orig_data + orig->head, linear);
     ::memcpy(copy_data + linear, orig_data, orig->size - linear);
   }
+}
+
+std::uint64_t read_seq(std::atomic_uint64_t &seq) {
+  // memory_order_acquire is sufficient here b/c we only need ensure
+  // subsequent loads are not reordered before the sequence load.
+  //
+  // The `& ~0x1` is just to ensure we retry in the event there is
+  // a writer in the critical section. The sequence will be odd if
+  // there is a write in progress.
+  return seq.load(std::memory_order_acquire) & ~0x1ULL;
+}
+
+// Returns whether or not to retry the read critical section
+bool read_retry(std::atomic_uint64_t &seq, std::uint64_t old_seq) {
+  // memory_order_acq_rel is necessary here to ensure prior loads
+  // are not reordered after the sequence load. memory_order_acquire
+  // only guarantees subsequent loads are not reordered before the
+  // sequence load, and not the other way around.
+  //
+  // If we see that the sequence was even _and_ unchanged before and
+  // after the critical section, it means we got a consistent view
+  // of the blackbox.
+  std::atomic_thread_fence(std::memory_order_acq_rel);
+  return seq.load(std::memory_order_relaxed) != old_seq;
+}
+
+// Copy blackbox from `orig` to `copy`
+void copy(Blackbox *copy, Blackbox *orig) {
+  std::uint64_t seq;
+
+  do {
+    seq = read_seq(orig->sequence);
+    copy_locked(copy, orig);
+  } while (read_retry(orig->sequence, seq));
 }
 
 std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
@@ -77,7 +112,6 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
   auto blackbox = static_cast<Blackbox *>(::malloc(sb.st_size));
 
   // Copy out entire blackbox to minimize critical section.
-  // XXX: respect sequence lock
   copy(blackbox, static_cast<Blackbox *>(ptr));
 
   auto deleter = [](Blackbox *p) { ::free(p); };

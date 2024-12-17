@@ -50,6 +50,7 @@ key1=val1
 * Entries are TLV (tag-length-value) for extensibility
 * Backing ringbuffer is mapped twice for always-linear access
 * Shared memory (tmpfs) is used to not take kernel `mmap_lock` in application
+* Implements a userspace sequence lock for data consistency
 
 ## TODO
 

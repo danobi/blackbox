@@ -13,6 +13,6 @@ demo/demo: demo/demo.cpp libblackbox.so
 	$(CXX) $(CXXFLAGS) $< -L. -lblackbox -Wl,-rpath,. -I. -o $@ -g
 
 clean:
-	rm -f extractor demo libblackbox.so
+	rm -f extractor demo/demo libblackbox.so
 
 .PHONY: all clean

@@ -9,7 +9,6 @@ int main() {
   blackbox::write("hello world!");
   blackbox::write(123);
   blackbox::write("key1", "val1");
-  blackbox::dump(std::cout);
 
-  std::this_thread::sleep_for(std::chrono::seconds(100));
+  std::this_thread::sleep_for(std::chrono::seconds(10));
 }

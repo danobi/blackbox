@@ -97,6 +97,7 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
   if (::fstat(fd, &sb) == -1) {
     auto err = std::strerror(errno);
     std::cerr << "fstat failed: " << err << std::endl;
+    ::close(fd);
     return nullptr;
   }
 
@@ -105,6 +106,7 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
   if (ptr == MAP_FAILED) {
     auto err = std::strerror(errno);
     std::cerr << "mmap failed: " << err << std::endl;
+    ::close(fd);
     return nullptr;
   }
 
@@ -114,7 +116,11 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
   // Copy out entire blackbox to minimize critical section.
   copy(blackbox, static_cast<Blackbox *>(ptr));
 
-  auto deleter = [](Blackbox *p) { ::free(p); };
+  auto deleter = [&](Blackbox *p) {
+    ::free(p);
+    ::munmap(ptr, sb.st_size);
+    ::close(fd);
+  };
   return std::unique_ptr<Blackbox, decltype(deleter)>(blackbox, deleter);
 }
 

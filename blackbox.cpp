@@ -84,12 +84,18 @@ void cleanup() {
   ::shm_unlink(shm_name.c_str());
 }
 
-void init_once(std::size_t size) {
+int init_once(std::size_t size) noexcept {
+  std::size_t addr_space_size;
+  std::size_t page_size;
+  std::size_t ring_size;
+  char *ptr;
+  int err;
+
   // Create shared memory segment
   auto shm_name = get_shm_name();
   auto fd = ::shm_open(shm_name.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
   if (fd < 0) {
-    throw std::system_error(errno, std::system_category(), "shm_open");
+    return -errno;
   }
 
   // Setup destructor for normal program termination.
@@ -97,17 +103,19 @@ void init_once(std::size_t size) {
   // In other words, we want the shared memory segment to persist if SIGKILL
   // was delivered.
   if (std::atexit(cleanup)) {
-    throw std::system_error(errno, std::generic_category(), "atexit");
+    err = -errno;
+    goto cleanup_shm;
   }
 
   // Give ring buffer PAGE_SIZE alignment so we can double map
-  const std::size_t page_size = getpagesize();
-  auto ring_size = round_up_to_nearest(size, page_size);
+  page_size = getpagesize();
+  ring_size = round_up_to_nearest(size, page_size);
 
   // Size segment to requested size.
   // NB: we give the header a full page to achieve alignment.
   if (::ftruncate(fd, page_size + ring_size) < 0) {
-    throw std::system_error(errno, std::system_category(), "ftruncate");
+    err = -errno;
+    goto cleanup_shm;
   }
 
   // Reserve header + 2x ringbuffer address space to prevent races with
@@ -116,31 +124,38 @@ void init_once(std::size_t size) {
   // We're going to mmap the ring buffer twice so access is always linear
   // in our address space. This prevents TLV headers from being split
   // and thus allows reliable pointer casts.
-  const auto addr_space_size = page_size + 2 * ring_size;
-  auto ptr = static_cast<char *>(::mmap(nullptr, addr_space_size,
-                                        PROT_READ | PROT_WRITE,
-                                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  addr_space_size = page_size + 2 * ring_size;
+  ptr = static_cast<char *>(::mmap(nullptr, addr_space_size,
+                                   PROT_READ | PROT_WRITE,
+                                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
   if (ptr == MAP_FAILED) {
-    throw std::system_error(errno, std::system_category(), "mmap anon");
+    err = -errno;
+    goto cleanup_shm;
   }
 
   // Map blackbox header
   if (::mmap(ptr, page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
              0) == MAP_FAILED) {
-    throw std::system_error(errno, std::system_category(), "mmap bb");
+    err = -errno;
+    goto cleanup;
   }
 
   // Map first copy of ring buffer
   if (::mmap(ptr + page_size, ring_size, PROT_READ | PROT_WRITE,
              MAP_SHARED | MAP_FIXED, fd, page_size) == MAP_FAILED) {
-    throw std::system_error(errno, std::system_category(), "mmap rb1");
+    err = -errno;
+    goto cleanup;
   }
 
   // Map second copy of ring buffer at tail of first copy
   if (::mmap(ptr + page_size + ring_size, ring_size, PROT_READ | PROT_WRITE,
              MAP_SHARED | MAP_FIXED, fd, page_size) == MAP_FAILED) {
-    throw std::system_error(errno, std::system_category(), "mmap rb2");
+    err = -errno;
+    goto cleanup;
   }
+
+  // Done with fd now
+  ::close(fd);
 
   // Initialize the blackbox
   blackbox = reinterpret_cast<Blackbox *>(ptr);
@@ -149,6 +164,14 @@ void init_once(std::size_t size) {
   blackbox->psize = ring_size;
   blackbox->padding = page_size - sizeof(Blackbox);
   std::memset(blackbox->padding_start + blackbox->padding, 0, ring_size);
+  return 0;
+
+cleanup:
+  ::munmap(ptr, addr_space_size);
+cleanup_shm:
+  ::close(fd);
+  ::shm_unlink(shm_name.c_str());
+  return err;
 }
 
 // Makes room in ring buffer for at least `bytes` bytes.
@@ -202,8 +225,10 @@ int insert(Type type, void *entry, std::uint64_t entry_size) {
 
 } // namespace
 
-void init(std::size_t size) {
-  std::call_once(init_flag, [&]() { init_once(size); });
+int init(std::size_t size) noexcept {
+  static int ret;
+  std::call_once(init_flag, [&]() { ret = init_once(size); });
+  return ret;
 }
 
 int write(std::string_view s) noexcept {

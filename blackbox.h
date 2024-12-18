@@ -34,7 +34,10 @@ constexpr std::size_t DEFAULT_SIZE = 512 << 10;
 //
 // `size` must be a multiple of PAGE_SIZE. If `size` is not, blackbox will
 // round up to the nearest multiple of PAGE_SIZE.
-void init(std::size_t size = DEFAULT_SIZE);
+//
+// On success, returns 0. On failure, returns negative error code suitable
+// for std::sterror(-ret);
+int init(std::size_t size = DEFAULT_SIZE) noexcept;
 
 // Thread-safe writes into the blackbox.
 //

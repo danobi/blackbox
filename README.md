@@ -56,5 +56,3 @@ key1=val1
 
 - [ ] Tests (you dummy!)
 - [ ] Check that wraparound codepaths actually work
-- [ ] Make extractor respect force
-- [ ] Make extractor check application liveness

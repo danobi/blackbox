@@ -1,3 +1,4 @@
+#include <cerrno>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -8,6 +9,7 @@
 
 #include <fcntl.h>
 #include <getopt.h>
+#include <signal.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
@@ -72,14 +74,20 @@ bool read_retry(std::atomic_uint64_t &seq, std::uint64_t old_seq) {
   return seq.load(std::memory_order_relaxed) != old_seq;
 }
 
-// Copy blackbox from `orig` to `copy`
-void copy(Blackbox *copy, Blackbox *orig) {
+// Copy blackbox from `orig` to `copy`.
+//
+// Returns whether or not a consistent copy was made.
+bool copy(Blackbox *copy, Blackbox *orig) {
+  int retries = 1000;
   std::uint64_t seq;
+  bool retry;
 
   do {
     seq = read_seq(orig->sequence);
     copy_locked(copy, orig);
-  } while (read_retry(orig->sequence, seq));
+  } while ((retry = read_retry(orig->sequence, seq)) && --retries);
+
+  return !retry;
 }
 
 std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
@@ -114,14 +122,18 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
   auto blackbox = static_cast<Blackbox *>(::malloc(sb.st_size));
 
   // Copy out entire blackbox to minimize critical section.
-  copy(blackbox, static_cast<Blackbox *>(ptr));
+  bool success = copy(blackbox, static_cast<Blackbox *>(ptr));
 
   // Done with shared memory
   ::munmap(ptr, sb.st_size);
   ::close(fd);
 
-  auto deleter = [&](Blackbox *p) { ::free(p); };
-  return std::unique_ptr<Blackbox, decltype(deleter)>(blackbox, deleter);
+  if (success) {
+    auto deleter = [&](Blackbox *p) { ::free(p); };
+    return std::unique_ptr<Blackbox, decltype(deleter)>(blackbox, deleter);
+  }
+
+  return nullptr;
 }
 
 int dump(Blackbox *blackbox) {
@@ -158,9 +170,14 @@ int dump(Blackbox *blackbox) {
   return 0;
 }
 
+bool is_alive(int pid) {
+  return ::kill(pid, 0) == 0 || errno == EPERM;
+}
+
 int extract(int pid) {
   auto blackbox = grab(pid);
   if (!blackbox) {
+    std::cerr << "Failed to extract blackbox from pid=" << pid << std::endl;
     return -1;
   }
 
@@ -190,5 +207,10 @@ int main(int argc, char *argv[]) {
   }
 
   int pid = std::stoi(argv[optind]);
-  return extract(pid);
+  int ret = extract(pid);
+  if (ret && !is_alive(pid)) {
+    std::cerr << "Data loss -- process crashed during a write" << std::endl;
+  }
+
+  return ret;
 }

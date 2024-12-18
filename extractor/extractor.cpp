@@ -22,7 +22,6 @@ namespace {
 void help() {
   std::cout << "Usage: extractor <pid> [options]\n"
             << "\nOptions:\n"
-            << "  --force    Force extraction even if unsafe\n"
             << "  -h, --help Show this help message\n"
             << "\nArguments:\n"
             << "  pid        Process ID to extract\n"

@@ -55,4 +55,3 @@ key1=val1
 ## TODO
 
 - [ ] Tests (you dummy!)
-- [ ] Check that wraparound codepaths actually work

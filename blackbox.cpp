@@ -200,7 +200,7 @@ int make_room_for(std::uint64_t bytes) {
     evicted++;
   }
 
-  return -ENOSYS;
+  return evicted;
 }
 
 // Inserts an entry into the ring buffer.

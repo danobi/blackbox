@@ -116,11 +116,11 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
   // Copy out entire blackbox to minimize critical section.
   copy(blackbox, static_cast<Blackbox *>(ptr));
 
-  auto deleter = [&](Blackbox *p) {
-    ::free(p);
-    ::munmap(ptr, sb.st_size);
-    ::close(fd);
-  };
+  // Done with shared memory
+  ::munmap(ptr, sb.st_size);
+  ::close(fd);
+
+  auto deleter = [&](Blackbox *p) { ::free(p); };
   return std::unique_ptr<Blackbox, decltype(deleter)>(blackbox, deleter);
 }
 

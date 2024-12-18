@@ -191,10 +191,10 @@ int make_room_for(std::uint64_t bytes) {
   // Delete stuff from head until there's enough room
   int evicted = 0;
   while ((blackbox->psize - blackbox->size) < bytes) {
-    auto h = head(blackbox);
-    assert(h->type != Type::Invalid);
+    auto hdr = head(blackbox);
+    assert(hdr->type != Type::Invalid);
 
-    auto deleted_sz = h->size();
+    auto deleted_sz = hdr->size();
     blackbox->size -= deleted_sz;
     blackbox->head = (blackbox->head + deleted_sz) % blackbox->psize;
     evicted++;

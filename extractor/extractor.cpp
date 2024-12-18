@@ -124,9 +124,7 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
   return std::unique_ptr<Blackbox, decltype(deleter)>(blackbox, deleter);
 }
 
-int dump(Blackbox *blackbox, bool force) {
-  (void)force;
-
+int dump(Blackbox *blackbox) {
   auto head = blackbox->head;
   auto tail = (blackbox->head + blackbox->size) % blackbox->psize;
   while (head != tail) {
@@ -160,22 +158,19 @@ int dump(Blackbox *blackbox, bool force) {
   return 0;
 }
 
-int extract(int pid, bool force) {
+int extract(int pid) {
   auto blackbox = grab(pid);
   if (!blackbox) {
     return -1;
   }
 
-  return dump(blackbox.get(), force);
+  return dump(blackbox.get());
 }
 
 } // namespace
 
 int main(int argc, char *argv[]) {
-  bool force = false;
-
-  struct option opts[] = {
-      {"help", no_argument, 0, 'h'}, {"force", no_argument, 0, 'f'}, {}};
+  struct option opts[] = {{"help", no_argument, 0, 'h'}, {}};
 
   int opt;
   while ((opt = getopt_long(argc, argv, "h", opts, nullptr)) != -1) {
@@ -183,9 +178,6 @@ int main(int argc, char *argv[]) {
     case 'h':
       help();
       return 0;
-    case 'f':
-      force = true;
-      break;
     default:
       std::cerr << "Try 'extractor --help' for more information" << std::endl;
       return 1;
@@ -198,5 +190,5 @@ int main(int argc, char *argv[]) {
   }
 
   int pid = std::stoi(argv[optind]);
-  return extract(pid, force);
+  return extract(pid);
 }

@@ -84,18 +84,46 @@ void cleanup() {
   ::shm_unlink(shm_name.c_str());
 }
 
+// Utility class just to make cleanup simpler
+class InitCleaner {
+public:
+  InitCleaner() = default;
+  ~InitCleaner() {
+    if (disarm_) {
+      return;
+    }
+    if (addr_space) {
+      ::munmap(addr_space, addr_space_size);
+    }
+    if (shm_fd >= 0) {
+      ::close(shm_fd);
+    }
+    if (shm_name) {
+      ::shm_unlink(shm_name);
+    }
+  }
+
+  void disarm() { disarm_ = true; }
+
+  int shm_fd = -1;
+  char *addr_space = nullptr;
+  std::size_t addr_space_size = 0;
+  const char *shm_name = nullptr;
+
+private:
+  bool disarm_ = false;
+};
+
 int init_once(std::size_t size) noexcept {
-  std::size_t addr_space_size;
-  std::size_t page_size;
-  std::size_t ring_size;
-  char *ptr;
-  int err;
+  InitCleaner cleaner;
 
   // Create shared memory segment
   auto shm_name = get_shm_name();
   auto fd = ::shm_open(shm_name.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
   if (fd < 0) {
     return -errno;
+  } else {
+    cleaner.shm_fd = fd;
   }
 
   // Setup destructor for normal program termination.
@@ -103,19 +131,17 @@ int init_once(std::size_t size) noexcept {
   // In other words, we want the shared memory segment to persist if SIGKILL
   // was delivered.
   if (std::atexit(cleanup)) {
-    err = -errno;
-    goto cleanup_shm;
+    return -errno;
   }
 
   // Give ring buffer PAGE_SIZE alignment so we can double map
-  page_size = getpagesize();
-  ring_size = round_up_to_nearest(size, page_size);
+  auto page_size = getpagesize();
+  auto ring_size = round_up_to_nearest(size, page_size);
 
   // Size segment to requested size.
   // NB: we give the header a full page to achieve alignment.
   if (::ftruncate(fd, page_size + ring_size) < 0) {
-    err = -errno;
-    goto cleanup_shm;
+    return -errno;
   }
 
   // Reserve header + 2x ringbuffer address space to prevent races with
@@ -124,38 +150,34 @@ int init_once(std::size_t size) noexcept {
   // We're going to mmap the ring buffer twice so access is always linear
   // in our address space. This prevents TLV headers from being split
   // and thus allows reliable pointer casts.
-  addr_space_size = page_size + 2 * ring_size;
-  ptr = static_cast<char *>(::mmap(nullptr, addr_space_size,
-                                   PROT_READ | PROT_WRITE,
-                                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  auto addr_space_size = page_size + 2 * ring_size;
+  auto ptr = static_cast<char *>(::mmap(nullptr, addr_space_size,
+                                        PROT_READ | PROT_WRITE,
+                                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
   if (ptr == MAP_FAILED) {
-    err = -errno;
-    goto cleanup_shm;
+    return -errno;
+  } else {
+    cleaner.addr_space = ptr;
+    cleaner.addr_space_size = addr_space_size;
   }
 
   // Map blackbox header
   if (::mmap(ptr, page_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
              0) == MAP_FAILED) {
-    err = -errno;
-    goto cleanup;
+    return -errno;
   }
 
   // Map first copy of ring buffer
   if (::mmap(ptr + page_size, ring_size, PROT_READ | PROT_WRITE,
              MAP_SHARED | MAP_FIXED, fd, page_size) == MAP_FAILED) {
-    err = -errno;
-    goto cleanup;
+    return -errno;
   }
 
   // Map second copy of ring buffer at tail of first copy
   if (::mmap(ptr + page_size + ring_size, ring_size, PROT_READ | PROT_WRITE,
              MAP_SHARED | MAP_FIXED, fd, page_size) == MAP_FAILED) {
-    err = -errno;
-    goto cleanup;
+    return -errno;
   }
-
-  // Done with fd now
-  ::close(fd);
 
   // Initialize the blackbox
   blackbox = reinterpret_cast<Blackbox *>(ptr);
@@ -164,14 +186,13 @@ int init_once(std::size_t size) noexcept {
   blackbox->psize = ring_size;
   blackbox->padding = page_size - sizeof(Blackbox);
   std::memset(blackbox->padding_start + blackbox->padding, 0, ring_size);
-  return 0;
 
-cleanup:
-  ::munmap(ptr, addr_space_size);
-cleanup_shm:
+  // We succeeded in initialization, so disarm cleanup
+  cleaner.disarm();
+  // We're done with shared memory handle, though
   ::close(fd);
-  ::shm_unlink(shm_name.c_str());
-  return err;
+
+  return 0;
 }
 
 // Makes room in ring buffer for at least `bytes` bytes.

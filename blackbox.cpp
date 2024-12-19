@@ -216,6 +216,7 @@ int insert(Type type, void *entry, std::uint64_t entry_size) {
 
     auto hdr = tail(blackbox);
     hdr->type = type;
+    hdr->len = entry_size;
     std::memcpy(hdr->data, entry, entry_size);
     blackbox->size += size;
 

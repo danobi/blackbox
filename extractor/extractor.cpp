@@ -159,8 +159,11 @@ int dump(Blackbox *blackbox) {
       std::cout << std::format("{}={}", key, val) << std::endl;
       break;
     }
-    case Type::Invalid:
-      return -1;
+    default:
+      // Header::len gives us forward compatability.
+      // If the target is using a newer version, we can just the new types.
+      std::cout << "[unknown entry type]" << std::endl;
+      break;
     }
 
     head = (head + hdr->size()) % blackbox->psize;

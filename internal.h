@@ -85,32 +85,14 @@ struct KeyValueEntry {
 struct Header {
   // Type of entry
   Type type;
+  // Length of type dependent data
+  std::uint64_t len;
   // Start of type dependent data
   std::uint8_t data[];
 
-  std::uint64_t size() {
-    auto sz = sizeof(Header);
-
-    switch (type) {
-    case Type::Invalid:
-      // Very suspicious to take size of invalid entry.
-      // But technically it has no trailing value.
-      break;
-    case Type::String:
-      sz += reinterpret_cast<StringEntry *>(data)->size();
-      break;
-    case Type::Int:
-      sz += reinterpret_cast<IntEntry *>(data)->size();
-      break;
-    case Type::KeyValue:
-      sz += reinterpret_cast<KeyValueEntry *>(data)->size();
-      break;
-    }
-
-    return sz;
-  }
-};
-static_assert(sizeof(Header) == sizeof(Type));
+  // Returns number of bytes this entry occupies (including header)
+  std::uint64_t size() { return sizeof(Header) + len; }
+} __attribute__((packed));
 static_assert(sizeof(Header) == offsetof(Header, data));
 
 Header *header(Blackbox *blackbox, std::uint64_t off) {

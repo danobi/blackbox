@@ -55,3 +55,4 @@ key1=val1
 ## TODO
 
 - [ ] Tests (you dummy!)
+- [ ] Add lockfree in-process reader for dump during signal handling

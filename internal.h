@@ -40,6 +40,22 @@ enum class Type : std::uint8_t {
 };
 static_assert(sizeof(Type) == 1);
 
+// Type header for each entry in the blackbox.
+//
+// This is the outer-most header.
+struct Header {
+  // Type of entry
+  Type type;
+  // Length of type dependent data
+  std::uint64_t len;
+  // Start of type dependent data
+  std::uint8_t data[];
+
+  // Returns number of bytes this entry occupies (including header)
+  std::uint64_t size() { return sizeof(Header) + len; }
+} __attribute__((packed));
+static_assert(sizeof(Header) == offsetof(Header, data));
+
 // String entry.
 //
 // NUL terminator is not stored.
@@ -78,22 +94,6 @@ struct KeyValueEntry {
   // Returns number of bytes this entry occupies (including header)
   std::uint64_t size() { return sizeof(KeyValueEntry) + key_len + val_len; }
 };
-
-// Type header for each entry in the blackbox.
-//
-// This is the outer-most header.
-struct Header {
-  // Type of entry
-  Type type;
-  // Length of type dependent data
-  std::uint64_t len;
-  // Start of type dependent data
-  std::uint8_t data[];
-
-  // Returns number of bytes this entry occupies (including header)
-  std::uint64_t size() { return sizeof(Header) + len; }
-} __attribute__((packed));
-static_assert(sizeof(Header) == offsetof(Header, data));
 
 Header *header(Blackbox *blackbox, std::uint64_t off) {
   auto data = blackbox->padding_start + blackbox->padding;

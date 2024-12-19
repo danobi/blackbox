@@ -10,7 +10,6 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
-#include <system_error>
 
 #include <fcntl.h>
 #include <sys/mman.h>

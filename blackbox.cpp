@@ -290,7 +290,13 @@ int write(std::string_view key, std::string_view value) noexcept {
 }
 
 int dump(std::ostream &out) {
-  std::scoped_lock guard(lock);
+  // Attempt to acquire lock. We cannot blindly block - we could be
+  // running in signal handler context (eg SIGSEGV handling) and have
+  // interrupted an in-progress write.
+  std::unique_lock guard(lock, std::try_to_lock);
+  if (!guard.owns_lock()) {
+    return -EWOULDBLOCK;
+  }
 
   int dumped = 0;
   auto head = blackbox->head;

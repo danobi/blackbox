@@ -20,6 +20,8 @@ from the application destroys the blackbox.
 
 The API is documented in [blackbox.h](./blackbox.h).
 
+A more detailed technical writeup is [available here](https://dxuuu.xyz/blackbox.html).
+
 ## Demo
 
 ```

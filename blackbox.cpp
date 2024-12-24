@@ -4,7 +4,10 @@
 #include <cassert>
 #include <cerrno>
 #include <cstring>
+#include <csignal>
 #include <exception>
+#include <concepts>
+#include <optional>
 #include <format>
 #include <functional>
 #include <iostream>
@@ -29,14 +32,46 @@ std::mutex lock;
 // Internal state
 std::once_flag init_flag;
 Blackbox *blackbox = nullptr;
+thread_local sig_atomic_t lock_taken;
 
 std::size_t round_up_to_nearest(std::size_t size, std::size_t align) {
   return (size + align - 1) & ~(align - 1);
 }
 
-template <typename F> auto write_locked(F &&f) -> decltype(f()) {
+// Utility class for signal-safe RAII locking
+class SignalSafeLock {
+ public:
+  static std::optional<SignalSafeLock> grabLock() {
+    if (lock_taken) {
+      return std::nullopt;
+    }
+    return SignalSafeLock();
+  }
+
+  SignalSafeLock(SignalSafeLock &&) = default;
+
+  ~SignalSafeLock() {
+    lock_.unlock();
+    lock_taken = 0;
+  }
+
+ private:
+  SignalSafeLock() : lock_(lock, std::defer_lock) {
+    lock_taken = 1;
+    lock_.lock();
+  }
+
+  std::unique_lock<std::mutex> lock_;
+};
+
+template <typename F> int write_locked(F &&f)
+  requires std::signed_integral<decltype(f())>
+{
   // Ensure only one writer is writing
-  lock.lock();
+  auto guard = SignalSafeLock::grabLock();
+  if (!guard) {
+    return -EDEADLK;
+  }
 
   // Transition into write and prevent any stores from being reordered around
   // this increment.
@@ -63,9 +98,6 @@ template <typename F> auto write_locked(F &&f) -> decltype(f()) {
   // makes the program run faster. Any subsequent critical sections will be
   // fenced by its corresponding acquire_release increment.
   blackbox->sequence.fetch_add(1, std::memory_order_release);
-
-  // Pair with above lock()
-  lock.unlock();
 
   return retval;
 }
@@ -292,10 +324,11 @@ int write(std::string_view key, std::string_view value) noexcept {
 int dump(std::ostream &out) {
   // Attempt to acquire lock. We cannot blindly block - we could be
   // running in signal handler context (eg SIGSEGV handling) and have
-  // interrupted an in-progress write.
-  std::unique_lock guard(lock, std::try_to_lock);
-  if (!guard.owns_lock()) {
-    return -EWOULDBLOCK;
+  // interrupted an in-progress write. Therefore return an error if
+  // lock is already taken.
+  auto guard = SignalSafeLock::grabLock();
+  if (!guard) {
+    return -EDEADLK;
   }
 
   int dumped = 0;

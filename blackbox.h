@@ -47,7 +47,7 @@ int init(std::size_t size = DEFAULT_SIZE) noexcept;
 // On failure, returns negative error code. The returned value is suitable
 // for std::strerror(-ret).
 //
-// These are not safe to call in signal handlers.
+// These are safe to call inside signal handlers.
 int write(std::string_view s) noexcept;
 int write(std::int64_t i) noexcept;
 int write(std::string_view key, std::string_view value) noexcept;

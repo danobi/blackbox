@@ -48,11 +48,18 @@ class SignalSafeLock {
     return SignalSafeLock();
   }
 
-  SignalSafeLock(SignalSafeLock &&) = default;
+  // Locks are non-copyable
+  SignalSafeLock(const SignalSafeLock &) = delete;
+  SignalSafeLock &operator=(const SignalSafeLock &) = delete;
+
+  SignalSafeLock(SignalSafeLock &&other) = default;
 
   ~SignalSafeLock() {
-    lock_.unlock();
-    lock_taken = 0;
+    // Do nothing if we are in moved-from state
+    if (lock_.owns_lock()) {
+      lock_.unlock();
+      lock_taken = 0;
+    }
   }
 
  private:

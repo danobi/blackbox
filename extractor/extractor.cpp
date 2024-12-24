@@ -119,6 +119,11 @@ std::unique_ptr<Blackbox, std::function<void(Blackbox *)>> grab(int pid) {
 
   // Allocate enough memory to hold entire blackbox
   auto blackbox = static_cast<Blackbox *>(::malloc(sb.st_size));
+  if (!blackbox) {
+    auto err = std::strerror(ENOMEM);
+    std::cerr << "malloc failed: " << err << std::endl;
+    return nullptr;
+  }
 
   // Copy out entire blackbox to minimize critical section.
   bool success = copy(blackbox, static_cast<Blackbox *>(ptr));

@@ -16,8 +16,8 @@
 //    3. Outside the application (after a crash)
 //
 // The blackbox is designed with data consistency in mind. It is always
-// possible to extract consistent a consistent snapshot while the process is
-// alive (assuming a reasonable amount of writes). In the event the application
+// possible to extract a consistent snapshot while the process is alive
+// (assuming a reasonable amount of writes). In the event the application
 // crashes, the extractor will be able to detect any inconsistency.
 
 namespace blackbox {

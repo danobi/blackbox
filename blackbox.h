@@ -58,7 +58,8 @@ int write(std::string_view key, std::string_view value) noexcept;
 // Returns number of entries dumped on success. On failure, returns
 // negative error code suitable for std::strerror(-ret).
 //
-// This is safe to call inside signal handlers.
+// This is safe to call inside signal handlers, assuming `operator<<`,
+// is async signal safe.
 int dump(std::ostream &out);
 
 } // namespace blackbox

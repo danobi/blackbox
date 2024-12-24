@@ -352,7 +352,7 @@ int dump(std::ostream &out) {
       auto kv = entry<KeyValueEntry>(hdr);
       auto key = std::string_view(kv->data, kv->key_len);
       auto val = std::string_view(kv->data + kv->key_len, kv->val_len);
-      out << std::format("{}={}", key, val) << std::endl;
+      out << key << "=" << val << std::endl;
       break;
     }
     case Type::Invalid:

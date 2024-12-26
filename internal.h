@@ -94,6 +94,7 @@ struct KeyValueEntry {
   // Returns number of bytes this entry occupies (including header)
   std::uint64_t size() { return sizeof(KeyValueEntry) + key_len + val_len; }
 };
+static_assert(sizeof(KeyValueEntry) == offsetof(KeyValueEntry, data));
 
 Header *header(Blackbox *blackbox, std::uint64_t off) {
   auto data = blackbox->padding_start + blackbox->padding;

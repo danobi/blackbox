@@ -27,6 +27,9 @@ namespace blackbox {
 // This does not include the page blackbox reserves for management overhead.
 constexpr std::size_t DEFAULT_SIZE = 512 << 10;
 
+// Minimum amount of headroom that must be included in write buffers.
+constexpr std::size_t MIN_HEADROOM = 16;
+
 // Thread-safe initialization routine for blackbox.
 //
 // Must be called before any other calls to blackbox APIs. Otherwise calling
@@ -46,11 +49,22 @@ int init(std::size_t size = DEFAULT_SIZE) noexcept;
 //
 // On failure, returns negative error code. The returned value is suitable
 // for std::strerror(-ret).
-//
-// These are safe to call inside signal handlers.
 int write(std::string_view s) noexcept;
 int write(std::int64_t i) noexcept;
 int write(std::string_view key, std::string_view value) noexcept;
+
+// Async-signal-safe writes.
+//
+// These are the same as the thread-safe variant, except there are no
+// internal memory allocations which makes it async-signal-safe, ie.
+// safe to call inside signal handlers.
+//
+// The writes are instead buffered in the required `buf` which must
+// contain at least `MIN_HEADROOM` extra bytes on top of the data.
+int write_noalloc(std::string_view s, void *buf) noexcept;
+int write_noalloc(std::int64_t i, void *buf) noexcept;
+int write_noalloc(std::string_view key, std::string_view value,
+                  void *buf) noexcept;
 
 // Dump contents of blackbox to an output stream with each entry on
 // its own line.

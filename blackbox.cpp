@@ -293,37 +293,44 @@ int init(std::size_t size) noexcept {
 
 int write(std::string_view s) noexcept {
   auto sz = sizeof(StringEntry) + s.size();
-  std::vector<std::uint8_t> buffer(sz);
-
-  auto entry = reinterpret_cast<StringEntry *>(buffer.data());
-  entry->len = s.size();
-  std::memcpy(entry->string, s.data(), s.size());
-  assert(sz == entry->size());
-
-  return insert(Type::String, entry, entry->size());
+  std::vector<std::byte> buffer(sz);
+  return write_noalloc(s, buffer.data());
 }
 
 int write(std::int64_t i) noexcept {
   auto sz = sizeof(IntEntry);
-  std::vector<std::uint8_t> buffer(sz);
-
-  auto entry = reinterpret_cast<IntEntry *>(buffer.data());
-  entry->val = i;
-  assert(sz == entry->size());
-
-  return insert(Type::Int, entry, entry->size());
+  std::vector<std::byte> buffer(sz);
+  return write_noalloc(i, buffer.data());
 }
 
 int write(std::string_view key, std::string_view value) noexcept {
   auto sz = sizeof(KeyValueEntry) + key.size() + value.size();
-  std::vector<std::uint8_t> buffer(sz);
+  std::vector<std::byte> buffer(sz);
+  return write_noalloc(key, value, buffer.data());
+}
 
-  auto entry = reinterpret_cast<KeyValueEntry *>(buffer.data());
+int write_noalloc(std::string_view s, void *buf) noexcept {
+  auto entry = reinterpret_cast<StringEntry *>(buf);
+  entry->len = s.size();
+  std::memcpy(entry->string, s.data(), s.size());
+
+  return insert(Type::String, entry, entry->size());
+}
+
+int write_noalloc(std::int64_t i, void *buf) noexcept {
+  auto entry = reinterpret_cast<IntEntry *>(buf);
+  entry->val = i;
+
+  return insert(Type::Int, entry, entry->size());
+}
+
+int write_noalloc(std::string_view key, std::string_view value,
+                  void *buf) noexcept {
+  auto entry = reinterpret_cast<KeyValueEntry *>(buf);
   entry->key_len = key.size();
   entry->val_len = value.size();
   std::memcpy(entry->data, key.data(), key.size());
   std::memcpy(entry->data + key.size(), value.data(), value.size());
-  assert(sz == entry->size());
 
   return insert(Type::KeyValue, entry, entry->size());
 }

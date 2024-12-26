@@ -3,6 +3,8 @@
 #include <atomic>
 #include <cstdint>
 
+#include "blackbox.h"
+
 namespace blackbox {
 namespace internal {
 
@@ -70,6 +72,7 @@ struct StringEntry {
 };
 static_assert(sizeof(StringEntry) == sizeof(uint64_t));
 static_assert(sizeof(StringEntry) == offsetof(StringEntry, string));
+static_assert(sizeof(StringEntry) <= MIN_HEADROOM);
 
 // Signed integer entry.
 struct IntEntry {
@@ -78,6 +81,7 @@ struct IntEntry {
   // Returns number of bytes this entry occupies (including header)
   std::uint64_t size() { return sizeof(IntEntry); }
 };
+static_assert(sizeof(IntEntry) <= MIN_HEADROOM);
 
 // Key/value entry.
 //
@@ -95,6 +99,7 @@ struct KeyValueEntry {
   std::uint64_t size() { return sizeof(KeyValueEntry) + key_len + val_len; }
 };
 static_assert(sizeof(KeyValueEntry) == offsetof(KeyValueEntry, data));
+static_assert(sizeof(KeyValueEntry) <= MIN_HEADROOM);
 
 Header *header(Blackbox *blackbox, std::uint64_t off) {
   auto data = blackbox->padding_start + blackbox->padding;
